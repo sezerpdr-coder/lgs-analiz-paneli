@@ -326,14 +326,30 @@
             stats.innerHTML = ""; if(myChart) myChart.destroy(); return;
         }
 
-        tbody.innerHTML = filtered.map(d => `
+        // Önceki sınavla kıyaslama yapacak küçük fonksiyon
+        const getArrow = (curr, prev) => {
+            if (prev === null) return ''; // İlk sınav için ok yok
+            if (curr > prev) return ' <span style="color: #27ae60; font-weight: bold; font-size: 14px;">↑</span>';
+            if (curr < prev) return ' <span style="color: #e74c3c; font-weight: bold; font-size: 14px;">↓</span>';
+            return ' <span style="color: #95a5a6; font-weight: bold; font-size: 14px;">-</span>'; // Değişmediyse
+        };
+
+        tbody.innerHTML = filtered.map((d, i) => {
+            let prev = i > 0 ? filtered[i-1] : null; // Bir önceki sınav verisi
+            return `
             <tr>
-                <td>${d.exam}</td><td>${d.tur.toFixed(2)}</td><td>${d.ink.toFixed(2)}</td><td>${d.din.toFixed(2)}</td>
-                <td>${d.ing.toFixed(2)}</td><td>${d.mat.toFixed(2)}</td><td>${d.fen.toFixed(2)}</td>
-                <td style="font-weight:bold; color:#2980b9">${d.total.toFixed(2)}</td>
-                <td style="font-weight:bold; color:#f39c12">${d.lgs.toFixed(2)}</td>
+                <td>${d.exam}</td>
+                <td>${d.tur.toFixed(2)}${getArrow(d.tur, prev ? prev.tur : null)}</td>
+                <td>${d.ink.toFixed(2)}${getArrow(d.ink, prev ? prev.ink : null)}</td>
+                <td>${d.din.toFixed(2)}${getArrow(d.din, prev ? prev.din : null)}</td>
+                <td>${d.ing.toFixed(2)}${getArrow(d.ing, prev ? prev.ing : null)}</td>
+                <td>${d.mat.toFixed(2)}${getArrow(d.mat, prev ? prev.mat : null)}</td>
+                <td>${d.fen.toFixed(2)}${getArrow(d.fen, prev ? prev.fen : null)}</td>
+                <td style="font-weight:bold; color:#2980b9">${d.total.toFixed(2)}${getArrow(d.total, prev ? prev.total : null)}</td>
+                <td style="font-weight:bold; color:#f39c12">${d.lgs.toFixed(2)}${getArrow(d.lgs, prev ? prev.lgs : null)}</td>
             </tr>
-        `).join('');
+            `;
+        }).join('');
 
         const ctx = document.getElementById('devChart').getContext('2d');
         if(myChart) myChart.destroy();
