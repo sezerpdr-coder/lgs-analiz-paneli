@@ -59,7 +59,7 @@
     <div class="sidebar">
         <h3>🔄 Veri Yönetimi</h3>
         <div class="info-box">
-            <strong>Sütun Düzeni:</strong> A: Ad Soyad, B: Sınav, C: Türkçe, D: İnkılap, E: Din, F: İngilizce, G: Mat, H: Fen, I: LGS Puanı. (Toplam net sistem tarafından C-H toplanarak bulunur).
+            <strong>Sütun Düzeni:</strong> A: Ad Soyad, B: Sınav, C: Türkçe, D: İnkılap, E: Din, F: İngilizce, G: Mat, H: Fen, I: LGS Puanı. (Toplam net C-H toplamıdır).
         </div>
         <button class="btn-refresh" onclick="verileriGetir()">🔄 Verileri Şimdi Yenile</button>
         <button class="btn-report" onclick="excelRaporAl()">📊 Veriyi CSV Olarak İndir</button>
@@ -157,21 +157,16 @@
         try {
             const response = await fetch(SHEET_URL + '&cache=' + new Date().getTime());
             const rawData = await response.text();
-            
-            // Satırları temizle
             const rows = rawData.split(/\r?\n/).filter(r => r.trim().length > 0);
             const separator = rows[0].includes(';') ? ';' : ',';
             
             dataStore = [];
-            
-            // Başlık satırını atlayarak (i=1) döngüye başla
             for(let i = 1; i < rows.length; i++) {
                 let rowStr = rows[i];
                 let cols = [];
                 let inQuotes = false;
                 let currentVal = '';
                 
-                // Virgül ve tırnak karmaşasını çözen özel parser
                 for (let char of rowStr) {
                     if (char === '"') {
                         inQuotes = !inQuotes;
@@ -184,17 +179,14 @@
                 }
                 cols.push(currentVal.trim());
 
-                // Eğer satırda yeterli sütun yoksa (A'dan I'ya kadar en az 9 sütun) atla
                 if(cols.length < 9) continue;
 
-                // Tablodaki sayıyı güvenli şekilde ondalık formata çevirir (15,50 -> 15.50)
                 const parseNum = (val) => {
                     if (!val) return 0;
                     let num = parseFloat(val.toString().replace(',', '.'));
                     return isNaN(num) ? 0 : num;
                 };
 
-                // A: Ad (0), B: Sınav (1), C: Tür (2), D: İnk (3), E: Din (4), F: İng (5), G: Mat (6), H: Fen (7), I: LGS (8)
                 const tur = parseNum(cols[2]);
                 const ink = parseNum(cols[3]);
                 const din = parseNum(cols[4]);
@@ -209,18 +201,14 @@
                     tur: tur, ink: ink, din: din,
                     ing: ing, mat: mat, fen: fen,
                     lgs: lgs,
-                    total: tur + ink + din + ing + mat + fen // Toplamı script kendisi net hesaplıyor
+                    total: tur + ink + din + ing + mat + fen
                 });
             }
-
-            if (dataStore.length === 0) alert("Uyarı: Okunabilir veri bulunamadı. Lütfen E-Tablo yapınızı kontrol edin.");
-
             dropdownlariGuncelle();
             analizGuncelle();
-            
         } catch (e) { 
             console.error(e);
-            alert("Veri bağlantı hatası: " + e.message); 
+            alert("Veri bağlantı hatası!"); 
         }
         document.getElementById('loadingMsg').style.display = 'none';
     }
@@ -251,7 +239,6 @@
         }
 
         let displayData = [];
-
         if (exam === "GENEL_ORTALAMA") {
             const studentGroups = {};
             dataStore.forEach(d => {
@@ -266,7 +253,6 @@
                 studentGroups[d.name].total += d.total;
                 studentGroups[d.name].count++;
             });
-
             displayData = Object.keys(studentGroups).map(name => ({
                 name: name,
                 tur: studentGroups[name].tur / studentGroups[name].count,
@@ -287,7 +273,6 @@
         if(displayData.length > 0) {
             const c = displayData.length;
             const f = (key) => (displayData.reduce((acc, d) => acc + d[key], 0) / c).toFixed(2);
-            
             avgContainer.innerHTML = `
                 <div class="stat-card"><h4>TÜR Ort.</h4><div class="stat-value">${f('tur')}</div></div>
                 <div class="stat-card"><h4>İNK Ort.</h4><div class="stat-value">${f('ink')}</div></div>
@@ -326,16 +311,22 @@
             stats.innerHTML = ""; if(myChart) myChart.destroy(); return;
         }
 
-        // Önceki sınavla kıyaslama yapacak küçük fonksiyon
+        // --- OKUL ORTALAMASI HESAPLAMA ---
+        const schoolAvgData = filtered.map(studentExam => {
+            const allInExam = dataStore.filter(d => d.exam === studentExam.exam);
+            const sum = allInExam.reduce((acc, curr) => acc + curr[currentBranch], 0);
+            return sum / allInExam.length;
+        });
+
         const getArrow = (curr, prev) => {
-            if (prev === null) return ''; // İlk sınav için ok yok
-            if (curr > prev) return ' <span style="color: #27ae60; font-weight: bold; font-size: 14px;">↑</span>';
-            if (curr < prev) return ' <span style="color: #e74c3c; font-weight: bold; font-size: 14px;">↓</span>';
-            return ' <span style="color: #95a5a6; font-weight: bold; font-size: 14px;">-</span>'; // Değişmediyse
+            if (prev === null) return '';
+            if (curr > prev) return ' <span style="color: #27ae60; font-weight: bold;">↑</span>';
+            if (curr < prev) return ' <span style="color: #e74c3c; font-weight: bold;">↓</span>';
+            return ' <span style="color: #95a5a6; font-weight: bold;">-</span>';
         };
 
         tbody.innerHTML = filtered.map((d, i) => {
-            let prev = i > 0 ? filtered[i-1] : null; // Bir önceki sınav verisi
+            let prev = i > 0 ? filtered[i-1] : null;
             return `
             <tr>
                 <td>${d.exam}</td>
@@ -347,8 +338,7 @@
                 <td>${d.fen.toFixed(2)}${getArrow(d.fen, prev ? prev.fen : null)}</td>
                 <td style="font-weight:bold; color:#2980b9">${d.total.toFixed(2)}${getArrow(d.total, prev ? prev.total : null)}</td>
                 <td style="font-weight:bold; color:#f39c12">${d.lgs.toFixed(2)}${getArrow(d.lgs, prev ? prev.lgs : null)}</td>
-            </tr>
-            `;
+            </tr>`;
         }).join('');
 
         const ctx = document.getElementById('devChart').getContext('2d');
@@ -357,20 +347,37 @@
             type: 'line',
             data: {
                 labels: filtered.map(d => d.exam),
-                datasets: [{
-                    label: branchNames[currentBranch],
-                    data: filtered.map(d => d[currentBranch]),
-                    borderColor: '#3498db', backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                    fill: true, tension: 0.3, pointRadius: 5
-                }]
+                datasets: [
+                    {
+                        label: 'Öğrenci: ' + branchNames[currentBranch],
+                        data: filtered.map(d => d[currentBranch]),
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        fill: true, tension: 0.3, pointRadius: 5, z: 2
+                    },
+                    {
+                        label: 'Okul Ortalaması',
+                        data: schoolAvgData,
+                        borderColor: '#e67e22',
+                        borderDash: [5, 5],
+                        backgroundColor: 'transparent',
+                        fill: false, tension: 0.3, pointRadius: 3, z: 1
+                    }
+                ]
             },
-            options: { responsive: true, maintainAspectRatio: false }
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top' }
+                }
+            }
         });
 
         const last = filtered[filtered.length-1];
         const avg = filtered.reduce((s, d) => s + d[currentBranch], 0) / filtered.length;
         stats.innerHTML = `
-            <div class="stat-card"><h4>Son Net/Puan</h4><div class="stat-value">${last[currentBranch].toFixed(2)}</div></div>
+            <div class="stat-card"><h4>Son Durum</h4><div class="stat-value">${last[currentBranch].toFixed(2)}</div></div>
             <div class="stat-card"><h4>Öğrenci Ort.</h4><div class="stat-value">${avg.toFixed(2)}</div></div>
             <div class="stat-card"><h4>Sınav Sayısı</h4><div class="stat-value">${filtered.length}</div></div>
         `;
